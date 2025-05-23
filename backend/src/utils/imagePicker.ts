@@ -13,7 +13,20 @@ export const pickImage = async (): Promise<{
       return null;
     }
   
-    c
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 1,
+    });
+  
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const uri = result.assets[0].uri;
+      const fileName = uri.split("/").pop() || `profile_${Date.now()}.jpg`;
+      const fileType = `image/${uri.split(".").pop()}`;
+  
+      return {
+        uri,
+        name: fileName,
         type: fileType,
       };
     }
