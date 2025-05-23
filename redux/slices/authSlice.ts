@@ -186,7 +186,21 @@ export const createPin = createAsyncThunk(
   async ({ pin }: CreatePinDetails, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState;
-   e.data.data;
+      const token = state.auth.user?.token;
+      const response = await axios.put(
+        `${Host}/api/auth/create-pin`,
+        {
+          pin,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      return response.data.data;
     } catch (error) {
       let errorMessage = "Failed to create pin";
       if (axios.isAxiosError(error)) {
