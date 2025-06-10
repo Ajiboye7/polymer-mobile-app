@@ -39,7 +39,14 @@ afterAll(async () => {
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import User from "../src/models/UserModels";
+import { sendOtpEmail } from "../src/utils/send-otp";
 
+
+// Mock sendOtpEmail to avoid actual email sending during tests
+jest.mock("../src/utils/send-otp", () => ({
+  sendOtpEmail: jest.fn().mockResolvedValue(true),
+  generateOTP: jest.requireActual("../src/utils/send-otp").generateOTP,
+}));
 jest.setTimeout(60000);
 
 let mongoServer: MongoMemoryServer;
@@ -80,13 +87,12 @@ beforeEach(async () => {
       "Password123!",
       "Password123!"
     );
-    console.log("Test user created:", user); // Debug: Confirm user creation
+    console.log("Test user created:", user);
   } catch (error) {
-    console.error("Failed to create test user:", error); // Debug: Log any errors
-    throw error; // Fail the test if user creation fails
+    console.error("Failed to create test user:", error);
+    throw error;
   }
 
-  // Debug: Verify the user exists in the database
   const savedUser = await User.findOne({ email: "john@example.com" });
   console.log("Saved user in database:", savedUser);
 });
