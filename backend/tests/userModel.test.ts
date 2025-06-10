@@ -47,7 +47,7 @@ describe("User Model", () => {
     ).rejects.toThrow("please enter a valid email");
   });
 
-  test("should not create a user wit an existing account", async () => {
+  test("should not create a user with an existing account", async () => {
     await User.signUp(
       "Jane Doe",
       "1234544",

@@ -38,24 +38,20 @@ afterAll(async () => {
 
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
+import User from "../src/models/UserModels";
+
+jest.setTimeout(60000);
 
 let mongoServer: MongoMemoryServer;
-
-// Increase timeout for all hooks and tests
-jest.setTimeout(60000); // 30 seconds
 
 beforeAll(async () => {
   console.log("Starting MongoDB memory server...");
   mongoServer = await MongoMemoryServer.create({
-    instance: {
-      dbName: "testdb",
-    },
+    instance: { dbName: "testdb" },
   });
-
   const uri = mongoServer.getUri();
   console.log(`MongoDB memory server started at: ${uri}`);
 
-  console.log("Connecting Mongoose to MongoDB...");
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 30000,
     socketTimeoutMS: 30000,
@@ -65,14 +61,32 @@ beforeAll(async () => {
 
 afterAll(async () => {
   console.log("Closing Mongoose connection...");
-  if (mongoose.connection.readyState === 1) {
-    await mongoose.connection.close();
-    console.log("Mongoose connection closed.");
-  }
-
-  console.log("Stopping MongoDB memory server...");
+  await mongoose.connection.close();
   if (mongoServer) {
     await mongoServer.stop();
     console.log("MongoDB memory server stopped.");
   }
+});
+
+beforeEach(async () => {
+  await User.deleteMany({}); // Clear the database before each test
+
+  // Create a test user for signIn tests
+  try {
+    const user = await User.signUp(
+      "John Doe",
+      "1234567890",
+      "john@example.com",
+      "Password123!",
+      "Password123!"
+    );
+    console.log("Test user created:", user); // Debug: Confirm user creation
+  } catch (error) {
+    console.error("Failed to create test user:", error); // Debug: Log any errors
+    throw error; // Fail the test if user creation fails
+  }
+
+  // Debug: Verify the user exists in the database
+  const savedUser = await User.findOne({ email: "john@example.com" });
+  console.log("Saved user in database:", savedUser);
 });

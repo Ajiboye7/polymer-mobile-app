@@ -73,7 +73,7 @@ describe("User Controller", () => {
     password: "wrongpassword",
   });
 
-  console.log(res.body); // 🔍 Log response to check if user exists
+  console.log(res.body); // Log response to check if user exists
 
   expect(res.statusCode).toBe(400);
   expect(res.body.error).toBe("Incorrect password");

@@ -86,15 +86,19 @@ UserSchema.statics.signUp = async function (
       throw new Error("Passwords do not match");
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // // Start a MongoDB session for transactions
+    // const session = await mongoose.startSession();
+    // // Begin the transaction to ensure atomicity
+    // session.startTransaction();
 
     try {
       if (!validator.isEmail(email)) {
         throw new Error("Please enter a valid email");
       }
 
-      const accountExists = await this.findOne({ account }).session(session);
+      // // Check for existing account within the transaction session
+      // const accountExists = await this.findOne({ account }).session(session);
+      const accountExists = await this.findOne({ account });
       if (accountExists) {
         throw new Error("Account number already exists");
       }
@@ -104,9 +108,9 @@ UserSchema.statics.signUp = async function (
       }
 
       const normalizedEmail = email.toLowerCase();
-      const exists = await this.findOne({ email: normalizedEmail }).session(
-        session
-      );
+      // // Check for existing email within the transaction session
+      // const exists = await this.findOne({ email: normalizedEmail }).session(session);
+      const exists = await this.findOne({ email: normalizedEmail });
       if (exists) {
         throw new Error("Email already exists");
       }
@@ -124,27 +128,41 @@ UserSchema.statics.signUp = async function (
         throw new Error("Failed to send OTP email. Please try again.");
       }
 
-      const user = await this.create(
-        [
-          {
-            name,
-            account,
-            email: normalizedEmail,
-            password: hash,
-            otp,
-            otpExpiry,
-          },
-        ],
-        { session }
-      );
+      // // Create the user within the transaction session
+      // const user = await this.create(
+      //   [{
+      //     name,
+      //     account,
+      //     email: normalizedEmail,
+      //     password: hash,
+      //     otp,
+      //     otpExpiry,
+      //   }],
+      //   { session }
+      // );
+      const user = await this.create({
+        name,
+        account,
+        email: normalizedEmail,
+        password: hash,
+        otp,
+        otpExpiry,
+      });
 
-      await session.commitTransaction();
-      session.endSession();
+      // // Commit the transaction to save changes
+      // await session.commitTransaction();
+      // // End the session
+      // session.endSession();
 
-      return user[0];
+      // // Return the first user from the array (transactional create returns an array)
+      // return user[0];
+      return user;
+
     } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
+      // // If an error occurs, abort the transaction to rollback changes
+      // await session.abortTransaction();
+      // // End the session
+      // session.endSession();
       throw error;
     }
   } catch (error) {
