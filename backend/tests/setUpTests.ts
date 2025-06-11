@@ -79,6 +79,7 @@ beforeEach(async () => {
   await User.deleteMany({}); // Clear the database before each test
 
   // Create a test user for signIn tests
+  
   try {
     const user = await User.signUp(
       "John Doe",

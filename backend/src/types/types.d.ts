@@ -46,7 +46,6 @@ export interface IProfileModel extends Model<IProfile> {
     address: string,
     nextOfKin: string,
     nextOfKinRelationship: string,
-    //profilePicture: string,
     userId: Types.ObjectId,
 
   ) => Promise<IProfile>;
