@@ -1,97 +1,203 @@
 import mongoose from "mongoose";
-import User from "../src/models/UserModels"; 
+import User from "../src/models/UserModels";
+import { sendOtpEmail, generateOTP } from "../src/utils/send-otp";
+import bcrypt from "bcrypt";
+
+console.log(bcrypt.genSalt); // Should show [MockFunction] if properly mocked
+
+
 jest.setTimeout(60000);
 
-beforeEach(async () => {
-  await User.deleteMany({}); 
-});
+// Mock bcrypt methods
+jest.mock("bcrypt", () => ({
+  genSalt: jest.fn().mockResolvedValue("mocked_salt"),
+  hash: jest.fn().mockResolvedValue("mocked_hashed_password"),
+  compare: jest.fn().mockImplementation((password, hash) =>
+    Promise.resolve(password === "Password123!" && hash === "mocked_hashed_password")
+  ),
+}));
 
-describe("User Model", () => {
-  test("should sign up a new user", async () => {
-    const user = await User.signUp(
+describe("User.signUp()", () => {
+  let user: any;
+
+  beforeEach(async () => {
+    // Clear mocks before each test
+    jest.clearAllMocks();
+    
+    user = await User.signUp(
       "John Doe",
-      "123456",
+      "1234567890",
       "john@example.com",
-      "Test@123",
-      "Test@123"
+      "Password123!",
+      "Password123!"
     );
-
-    expect(user).toBeDefined();
-    expect(user.email).toBe("john@example.com");
-    expect(user.name).toBe("John Doe");
   });
 
-  test("should not sign a user with an existing email", async () => {
-    await User.signUp(
-      "Jane Doe",
-      "987654",
-      "jane@example.com",
-      "Test@123",
-      "Test@123"
-    );
+  test("should successfully create a new user with OTP", async () => {
+    expect(user).toBeDefined();
+    expect(user.name).toBe("John Doe");
+    expect(user.email).toBe("john@example.com");
+    expect(user.account).toBe("1234567890");
+    expect(user.password).toBe("mocked_hashed_password");
+    expect(user.otp).toBe("123456");
+    expect(user.otpExpiry).toBeDefined();
+    expect(user.isVerified).toBe(false);
+    expect(user.balance).toBe(113000);
+  });
 
+  test("should call bcrypt.genSalt and bcrypt.hash with correct parameters", async () => {
+    expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
+    expect(bcrypt.hash).toHaveBeenCalledWith("Password123!", "mocked_salt");
+    expect(user.password).toBe("mocked_hashed_password");
+  });
+
+  test("should generate OTP using generateOTP", async () => {
+    expect(generateOTP).toHaveBeenCalled();
+    expect(user.otp).toBe("123456");
+  });
+
+  test("should set OTP expiry to 10 minutes in the future", async () => {
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000;
+    const otpExpiry = new Date(user.otpExpiry).getTime();
+
+    // Allow a small margin for timing differences (e.g., 1 second)
+    expect(otpExpiry).toBeGreaterThanOrEqual(now + tenMinutes - 1000);
+    expect(otpExpiry).toBeLessThanOrEqual(now + tenMinutes + 1000);
+  });
+
+  test("should call sendOtpEmail with correct parameters", async () => {
+    expect(sendOtpEmail).toHaveBeenCalledWith({
+      email: "john@example.com",
+      otp: "123456",
+    });
+  });
+
+  test("should throw error if sendOtpEmail fails", async () => {
+    (sendOtpEmail as jest.Mock).mockRejectedValueOnce(new Error("Email send failed"));
     await expect(
       User.signUp(
         "Jane Doe",
-        "123456",
+        "9876543210",
         "jane@example.com",
-        "Test@123",
-        "Test@123"
+        "Password123!",
+        "Password123!"
       )
-    ).rejects.toThrow("email already exists");
+    ).rejects.toThrow("Failed to send OTP email. Please try again.");
   });
 
-  test("should throw an error for invalid email", async () => {
+  test("should throw error for duplicate account number", async () => {
     await expect(
-      User.signUp("John Doe", "123456", "invalid-email", "Test@123", "Test@123")
-    ).rejects.toThrow("please enter a valid email");
+      User.signUp(
+        "Jane Doe",
+        "1234567890",
+        "jane@example.com",
+        "Password123!",
+        "Password123!"
+      )
+    ).rejects.toThrow("Account number already exists");
   });
 
-  test("should not create a user with an existing account", async () => {
-    await User.signUp(
-      "Jane Doe",
-      "1234544",
-      "jane@example.com",
-      "Test@123",
-      "Test@123"
-    );
-
+  test("should throw an error for existing email address", async () => {
     await expect(
       User.signUp(
         "Jane Doe",
         "1234544",
-        "jane@example.com",
+        "john@example.com",
         "Test@123",
         "Test@123"
       )
-    ).rejects.toThrow("Account number already exists")
+    ).rejects.toThrow("Email already exists");
   });
 
-  test("should successfully sign in a user", async () => {
-    await User.signUp(
-      "Jane Doe",
-      "987654",
-      "jane@example.com",
-      "Test@123",
-      "Test@123"
-    );
-
-    const user = await User.signIn("jane@example.com", "Test@123");
-    expect(user).toBeDefined();
-    expect(user.email).toBe("jane@example.com");
-  });
-
-  test("should throw an error for incorrect password", async () => {
-    await User.signUp(
-      "John Doe",
-      "123456",
-      "john@example.com",
-      "Test@123",
-      "Test@123"
-    );
-
+  test("should throw error for weak password", async () => {
     await expect(
-      User.signIn("john@example.com", "WrongPassword")
-    ).rejects.toThrow("Incorrect password");
+      User.signUp("John Doe", "1234567897", "john@example.com", "weak", "weak")
+    ).rejects.toThrow("Password not strong enough");
+  });
+
+  test("should throw error for password mismatch", async () => {
+    await expect(
+      User.signUp(
+        "John Doe",
+        "1234567890",
+        "john@example.com",
+        "Password123!",
+        "DifferentPassword123!"
+      )
+    ).rejects.toThrow("Passwords do not match");
+  });
+
+  test("should throw error for invalid email", async () => {
+    await expect(
+      User.signUp(
+        "John Doe",
+        "1234567890",
+        "invalid-email",
+        "Password123!",
+        "Password123!"
+      )
+    ).rejects.toThrow("Please enter a valid email");
+  });
+
+  test("should normalize email to lowercase", async () => {
+    const newUser = await User.signUp(
+      "John Doe",
+      "0987654321",
+      "John2@Example.com",
+      "Password123!",
+      "Password123!"
+    );
+    expect(newUser.email).toBe("john2@example.com");
+  });
+});
+
+describe("User.signIn()", () => {
+  let testUser: any;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testUser = await User.signUp(
+      "John Doe",
+      "1234567890",
+      "john@example.com",
+      "Password123!",
+      "Password123!"
+    );
+  });
+
+  test("should successfully sign in with correct credentials", async () => {
+    const user = await User.signIn("john@example.com", "Password123!");
+    expect(user).toHaveProperty("_id", testUser._id);
+    expect(user).toBeDefined();
+    expect(user.email).toBe("john@example.com");
+    expect(bcrypt.compare).toHaveBeenCalledWith("Password123!", "mocked_hashed_password");
+  });
+
+  test("should throw error for incorrect password", async () => {
+    await expect(
+      User.signIn("john@example.com", "WrongPassword123!")
+    ).rejects.toThrow("Incorrect Credentials");
+    expect(bcrypt.compare).toHaveBeenCalledWith("WrongPassword123!", "mocked_hashed_password");
+  });
+
+  test("should throw error for non-existent email", async () => {
+    await expect(
+      User.signIn("nonexistent@example.com", "Password123!")
+    ).rejects.toThrow("Incorrect Credentials");
+  });
+
+  test("should throw error for missing email or password", async () => {
+    await expect(User.signIn("", "Password123!")).rejects.toThrow(
+      "email and password require"
+    );
+    await expect(User.signIn("john@example.com", "")).rejects.toThrow(
+      "email and password require"
+    );
+  });
+
+  test("should normalize email during sign in", async () => {
+    const user = await User.signIn("John@Example.com", "Password123!");
+    expect(user.email).toBe("john@example.com");
   });
 });
