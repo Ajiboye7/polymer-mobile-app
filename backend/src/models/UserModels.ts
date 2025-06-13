@@ -22,6 +22,7 @@ const UserSchema = new Schema<IUser, IUserModel>({
     type: String,
     required: true,
     unique: true,
+    lowercase: true,
   },
 
   password: {
@@ -78,9 +79,9 @@ UserSchema.statics.signUp = async function (
   confirmPassword: string
 ) {
   try {
-    if (!name || !email || !password || !confirmPassword) {
-      throw new Error("All fields are to be filled ");
-    }
+   if (!name?.trim() || !email?.trim() || !password?.trim() || !confirmPassword?.trim() || !account?.trim()) {
+  throw new Error("All fields are required");
+}
 
     if (password !== confirmPassword) {
       throw new Error("Passwords do not match");
@@ -172,10 +173,9 @@ UserSchema.statics.signUp = async function (
 };
 
 UserSchema.statics.signIn = async function (email: string, password: string) {
-  if (!email || !password) {
-    throw new Error("email and password require");
-  }
-
+  if (!email?.trim() || !password?.trim()) {
+  throw new Error("Email and password are required");
+}
   if (!validator.isEmail(email)) {
     throw new Error("Please enter a valid email");
   }
