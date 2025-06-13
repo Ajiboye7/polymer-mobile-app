@@ -208,7 +208,6 @@ describe("User.signIn()", () => {
 });*/
 }
 
-
 import User from "../src/models/UserModels";
 import { sendOtpEmail, generateOTP } from "../src/utils/send-otp";
 import bcrypt from "bcrypt";
@@ -221,7 +220,6 @@ describe("User.signUp()", () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Mock bcrypt methods using jest.spyOn
     jest
       .spyOn(bcrypt, "genSalt")
       .mockImplementation(() => Promise.resolve("mocked_salt"));
@@ -230,13 +228,20 @@ describe("User.signUp()", () => {
       .mockImplementation(() => Promise.resolve("mocked_hashed_password"));
     jest
       .spyOn(bcrypt, "compare")
-      .mockImplementation((data: string | Buffer, encrypted: string) =>
+      .mockImplementation((password, hash) =>
+        Promise.resolve(
+          password === "Password123!" && hash === "mocked_hashed_password"
+        )
+      );
+
+      
+    /*.mockImplementation((data: string | Buffer, encrypted: string) =>
         Promise.resolve(
           typeof data === "string" &&
             data === "Password123!" &&
             encrypted === "mocked_hashed_password"
         )
-      );
+      );*/
     user = await User.signUp(
       "John Doe",
       "1234567890",
@@ -262,29 +267,28 @@ describe("User.signUp()", () => {
     expect(user.balance).toBe(113000);
   });
 
- 
-
   test("should throw error for missing or invalid sign-up fields", async () => {
-  const valid: [string, string, string, string, string] = [
-    "John Doe",
-    "1234567890",
-    "john@example.com",
-    "Password123!",
-    "Password123!",
-  ];
+    const valid: [string, string, string, string, string] = [
+      "John Doe",
+      "1234567890",
+      "john@example.com",
+      "Password123!",
+      "Password123!",
+    ];
 
-  const invalidValues: any[] = ["", "   ", null, undefined];
+    const invalidValues: any[] = ["", "   ", null, undefined];
 
-  for (let i = 0; i < valid.length; i++) {
-    for (const invalid of invalidValues) {
-      const args: [string, string, string, string, string] = [...valid];
-      args[i] = invalid as any; 
+    for (let i = 0; i < valid.length; i++) {
+      for (const invalid of invalidValues) {
+        const args: [string, string, string, string, string] = [...valid];
+        args[i] = invalid as any;
 
-      await expect(User.signUp(...args)).rejects.toThrow("All fields are required");
+        await expect(User.signUp(...args)).rejects.toThrow(
+          "All fields are required"
+        );
+      }
     }
-  }
-});
-
+  });
 
   test("should call bcrypt.genSalt and bcrypt.hash with correct parameters", async () => {
     expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
@@ -401,7 +405,6 @@ describe("User.signIn()", () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Mock bcrypt methods using jest.spyOn
     jest
       .spyOn(bcrypt, "genSalt")
       .mockImplementation(() => Promise.resolve("mocked_salt"));
@@ -418,8 +421,6 @@ describe("User.signIn()", () => {
         )
       );
 
-    // console.log("bcrypt.genSalt in test (signIn):", bcrypt.genSalt);
-
     testUser = await User.signUp(
       "John Doe",
       "1234567890",
@@ -430,7 +431,6 @@ describe("User.signIn()", () => {
   });
 
   afterEach(() => {
-    // Restore mocks after each test
     jest.restoreAllMocks();
   });
 
@@ -467,23 +467,21 @@ describe("User.signIn()", () => {
     );
   });
 
-  
-  
-
   test("should throw error for missing or invalid email or password", async () => {
-  const valid: [string, string] = ["john@example.com", "Password123!"];
-  const invalidValues: any[] = ["", "   ", null, undefined];
+    const valid: [string, string] = ["john@example.com", "Password123!"];
+    const invalidValues: any[] = ["", "   ", null, undefined];
 
-  for (let i = 0; i < valid.length; i++) {
-    for (const invalid of invalidValues) {
-      const args: [string, string] = [...valid];
-      args[i] = invalid as any;
+    for (let i = 0; i < valid.length; i++) {
+      for (const invalid of invalidValues) {
+        const args: [string, string] = [...valid];
+        args[i] = invalid as any;
 
-      await expect(User.signIn(...args)).rejects.toThrow("Email and password are required");
+        await expect(User.signIn(...args)).rejects.toThrow(
+          "Email and password are required"
+        );
+      }
     }
-  }
-});
-
+  });
 
   test("should normalize email during sign in", async () => {
     const user = await User.signIn("John@Example.com", "Password123!");
