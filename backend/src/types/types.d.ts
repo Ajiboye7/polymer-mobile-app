@@ -23,7 +23,7 @@ export interface IUserModel extends Model<IUser> {
     account: string,
     email: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
   ) => Promise<IUser>;
 
   signIn: (email: string, password: string) => Promise<IUser>;

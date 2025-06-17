@@ -111,7 +111,7 @@ export const signInUser = async (req: Request, res: Response): Promise<any> => {
         "Please enter a valid email",
         //"User does not exist",
         'Incorrect Credentials',
-        'Incorrect Credentials'
+        //'Incorrect Credentials'
        /// "Incorrect password",
       ];
 
