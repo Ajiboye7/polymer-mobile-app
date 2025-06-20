@@ -150,7 +150,7 @@ describe("User Controller Integration Tests", () => {
         otp: "123456",
       });
 
-      / 
+      // Verify user in database
       const user = await User.findOne({ email: "john@example.com" });
       expect(user).toBeDefined();
       expect(user?.name).toBe("John Doe");
