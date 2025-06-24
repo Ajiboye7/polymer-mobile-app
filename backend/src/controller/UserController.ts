@@ -98,7 +98,7 @@ export const signInUser = async (req: Request, res: Response): Promise<any> => {
           identityNumber: user.identityNumber,
           identityType: user.identityType,
         },
-      },
+      }, 
     });
   } catch (error) {
     console.error("Login error:", error);
