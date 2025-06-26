@@ -80,7 +80,7 @@ UserSchema.statics.signUp = async function (
 ) {
   try {
    if (!name?.trim() || !email?.trim() || !password?.trim() || !confirmPassword?.trim() || !account?.trim()) {
-  throw new Error("All fields are required");
+  throw new Error("All fields are to be filled");
 }
 
     if (password !== confirmPassword) {
@@ -174,7 +174,7 @@ UserSchema.statics.signUp = async function (
 
 UserSchema.statics.signIn = async function (email: string, password: string) {
   if (!email?.trim() || !password?.trim()) {
-  throw new Error("Email and password are required");
+  throw new Error("email and password required");
 }
   if (!validator.isEmail(email)) {
     throw new Error("Please enter a valid email");

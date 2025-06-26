@@ -58,10 +58,10 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { sendOtpEmail, generateOTP } from "../src/utils/send-otp";
 
-jest.mock("../src/utils/send-otp", () => ({
+/*jest.mock("../src/utils/send-otp", () => ({
   sendOtpEmail: jest.fn().mockResolvedValue(true),
   generateOTP: jest.fn().mockReturnValue(123456),
-}));
+}));*/
 
 jest.setTimeout(60000);
 

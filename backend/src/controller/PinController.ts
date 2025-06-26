@@ -123,7 +123,7 @@ export const confirmPin = async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    // ✅ Only update if match
+    // Only update if match
     user.isVerified = true;
     await user.save();
     return res.status(200).json({
