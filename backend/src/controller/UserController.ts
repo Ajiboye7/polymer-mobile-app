@@ -23,9 +23,9 @@ export const signUpUser = async (req: Request, res: Response): Promise<any> => {
       confirmPassword
     );
     const token = createToken(user._id);
-    console.log("User created:", user);
-    console.log("Token created:", token);
-    console.log("JWT_SECRET in signUpUser:", JWT_SECRET);
+    // console.log("User created:", user);
+    // console.log("Token created:", token);
+    //console.log("JWT_SECRET in signUpUser:", JWT_SECRET);
 
     return res.status(201).json({
       success: true,
@@ -71,7 +71,6 @@ export const signUpUser = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-
 export const signInUser = async (req: Request, res: Response): Promise<any> => {
   const { email, password } = req.body;
 
@@ -81,13 +80,12 @@ export const signInUser = async (req: Request, res: Response): Promise<any> => {
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message: "Account not verified. Please try add pin and confirm pin to get verified.",
+        message:
+          "Account not verified. Please try add pin and confirm pin to get verified.",
       });
     }
 
     const token = createToken(user._id);
-     console.log("sign in user:", user);
-    console.log("sign in token:", token);
 
     return res.status(200).json({
       success: true,
@@ -104,7 +102,7 @@ export const signInUser = async (req: Request, res: Response): Promise<any> => {
           identityNumber: user.identityNumber,
           identityType: user.identityType,
         },
-      }, 
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -116,9 +114,9 @@ export const signInUser = async (req: Request, res: Response): Promise<any> => {
         "email and password required",
         "Please enter a valid email",
         //"User does not exist",
-        'Incorrect Credentials',
+        "Incorrect Credentials",
         //'Incorrect Credentials'
-       /// "Incorrect password",
+        /// "Incorrect password",
       ];
 
       if (clientErrors.some((msg) => errorMessage.includes(msg))) {

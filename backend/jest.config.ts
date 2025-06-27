@@ -12,6 +12,7 @@ const config: Config = {
   collectCoverage: true,            // Enable code coverage
   coverageDirectory: '<rootDir>/coverage', // Output coverage reports here
   coverageReporters: ['text', 'lcov'], // Generate text and lcov reports
+    silent: false,
 };
 
 export default config;

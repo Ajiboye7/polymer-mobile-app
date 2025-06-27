@@ -80,7 +80,7 @@ describe("User.signUp()", () => {
         args[i] = invalid as any;
 
         await expect(User.signUp(...args)).rejects.toThrow(
-          "All fields are required"
+          "All fields are to be filled"
         );
       }
     }
@@ -279,7 +279,7 @@ describe("User.signIn()", () => {
         args[i] = invalid as any;
 
         await expect(User.signIn(...args)).rejects.toThrow(
-          "Email and password are required"
+          "email and password required"
         );
       }
     }

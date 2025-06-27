@@ -134,7 +134,6 @@ import { sendOtpEmail } from "../src/utils/send-otp";
 import User from "../src/models/UserModels";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-
 interface SignUpBody {
   name: string;
   account: string;
@@ -143,12 +142,10 @@ interface SignUpBody {
   confirmPassword: string;
 }
 
-
 interface SignInBody {
   email: string;
   password: string;
 }
-
 
 describe("User Controller Integration Tests", () => {
   beforeEach(async () => {
@@ -156,9 +153,6 @@ describe("User Controller Integration Tests", () => {
   });
 
   describe("POST /api/auth/sign-up", () => {
-
-    
-    
     const validSignUpBody: SignUpBody = {
       name: "John Doe",
       account: "1234567890",
@@ -168,27 +162,27 @@ describe("User Controller Integration Tests", () => {
     };
 
     const invalidFieldTests: [keyof SignUpBody, string | null | undefined][] = [
-    ["name", ""],
-    ["name", "   "],
-    ["name", null],
-    ["name", undefined],
-    ["account", ""],
-    ["account", "   "],
-    ["account", null],
-    ["account", undefined],
-    ["email", ""],
-    ["email", "   "],
-    ["email", null],
-    ["email", undefined],
-    ["password", ""],
-    ["password", "   "],
-    ["password", null],
-    ["password", undefined],
-    ["confirmPassword", ""],
-    ["confirmPassword", "   "],
-    ["confirmPassword", null],
-    ["confirmPassword", undefined],
-  ];
+      ["name", ""],
+      ["name", "   "],
+      ["name", null],
+      ["name", undefined],
+      ["account", ""],
+      ["account", "   "],
+      ["account", null],
+      ["account", undefined],
+      ["email", ""],
+      ["email", "   "],
+      ["email", null],
+      ["email", undefined],
+      ["password", ""],
+      ["password", "   "],
+      ["password", null],
+      ["password", undefined],
+      ["confirmPassword", ""],
+      ["confirmPassword", "   "],
+      ["confirmPassword", null],
+      ["confirmPassword", undefined],
+    ];
 
     test("should sign up a user successfully and return a token", async () => {
       (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
@@ -209,7 +203,7 @@ describe("User Controller Integration Tests", () => {
             name: "John Doe",
             account: "1234567890",
             email: "john@example.com",
-           token: "mocked-token-123",
+            token: "mocked-token-123",
           },
         },
       });
@@ -230,55 +224,68 @@ describe("User Controller Integration Tests", () => {
       expect(user?.balance).toBe(113000);*/
     });
 
-    
-
     test.each(invalidFieldTests)(
-    "should return 400 for invalid %s",
-    async (field: keyof SignUpBody, invalidValue: string | null | undefined) => {
-      const body: SignUpBody = { ...validSignUpBody, [field]: invalidValue };
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(body);
-      //console.log(`Sign-up error response for ${field}=${JSON.stringify(invalidValue)}:`, JSON.stringify(response.body, null, 2));
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: "All fields are to be filled",
-      });
-    }
-  );
-
-  test.each([
-    ["Passwords do not match", { ...validSignUpBody, confirmPassword: "Different123!" }],
-    ["Please enter a valid email", { ...validSignUpBody, email: "invalid-email" }],
-    ["Password not strong enough", { ...validSignUpBody, password: "weak", confirmPassword: "weak" }],
-    ["Account number already exists", { ...validSignUpBody }],
-    ["Email already exists", { ...validSignUpBody, account: "123476890" }],
-  ])(
-    "should return 400 for client error: %s",
-    async (errorMessage: string, body: SignUpBody) => {
-      // Pre-create a user for duplicate account/email tests
-      if (
-        errorMessage === "Account number already exists" ||
-        errorMessage === "Email already exists"
-      ) {
-        await request(app)
+      "should return 400 for invalid %s",
+      async (
+        field: keyof SignUpBody,
+        invalidValue: string | null | undefined
+      ) => {
+        const body: SignUpBody = { ...validSignUpBody, [field]: invalidValue };
+        const response = await request(app)
           .post("/api/auth/sign-up")
-          .send(validSignUpBody)
-          .expect(201);
+          .send(body);
+        //console.log(`Sign-up error response for ${field}=${JSON.stringify(invalidValue)}:`, JSON.stringify(response.body, null, 2));
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({
+          success: false,
+          message: "All fields are to be filled",
+        });
       }
+    );
 
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(body);
-      console.log("Sign-up error response:", JSON.stringify(response.body, null, 2));
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        success: false,
-        message: errorMessage,
-      });
-    }
-  );
+    test.each([
+      [
+        "Passwords do not match",
+        { ...validSignUpBody, confirmPassword: "Different123!" },
+      ],
+      [
+        "Please enter a valid email",
+        { ...validSignUpBody, email: "invalid-email" },
+      ],
+      [
+        "Password not strong enough",
+        { ...validSignUpBody, password: "weak", confirmPassword: "weak" },
+      ],
+      ["Account number already exists", { ...validSignUpBody }],
+      ["Email already exists", { ...validSignUpBody, account: "123476890" }],
+    ])(
+      "should return 400 for client error: %s",
+      async (errorMessage: string, body: SignUpBody) => {
+        // Pre-create a user for duplicate account/email tests
+        if (
+          errorMessage === "Account number already exists" ||
+          errorMessage === "Email already exists"
+        ) {
+          await request(app)
+            .post("/api/auth/sign-up")
+            .send(validSignUpBody)
+            .expect(201);
+        }
+
+        const response = await request(app)
+          .post("/api/auth/sign-up")
+          .send(body);
+        console.log(
+          "Sign-up error response:",
+          JSON.stringify(response.body, null, 2)
+        );
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({
+          success: false,
+          message: errorMessage,
+        });
+      }
+    );
     test("should return 400 for failed OTP email", async () => {
       (sendOtpEmail as jest.Mock).mockRejectedValueOnce(
         new Error("Email send failed")
@@ -324,8 +331,8 @@ describe("User Controller Integration Tests", () => {
       }
     });
 
-    test("should return 500 if JWT_SECRET is not defined", async () => {
-      
+    {
+      /*test("should return 500 if JWT_SECRET is not defined", async () => {
       jest.requireMock("../src/config/env").JWT_SECRET = undefined;
 
       const response = await request(app)
@@ -337,11 +344,31 @@ describe("User Controller Integration Tests", () => {
         success: false,
         message: "An unexpected error occurred during registration",
       });
+    });*/
+    }
 
-      
+    describe("when JWT_SECRET is not defined", () => {
+      beforeEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = undefined;
+      });
+
+      afterEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
+      });
+
+      test("should return 500 if JWT_SECRET is not defined", async () => {
+        const response = await request(app)
+          .post("/api/auth/sign-up")
+          .send(validSignUpBody)
+          .expect(500);
+
+        expect(response.body).toEqual({
+          success: false,
+          message: "An unexpected error occurred during registration",
+        });
+      });
     });
   });
-  
 
   describe("POST /api/auth/sign-in", () => {
     const validSignUpBody: SignUpBody = {
@@ -357,19 +384,15 @@ describe("User Controller Integration Tests", () => {
     };
 
     beforeEach(async () => {
-      
       jest.clearAllMocks();
-      jest.requireMock("../src/config/env").JWT_SECRET = 'test-secret';
+      //jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
       await request(app).post("/api/auth/sign-up").send(validSignUpBody);
 
       //.expect(201);
       await User.updateOne({ email: "john@example.com" }, { isVerified: true });
     });
 
-    
-
     test("should sign in a verified user successfully and return a token", async () => {
-      
       (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
 
       const response = await request(app)
@@ -405,7 +428,6 @@ describe("User Controller Integration Tests", () => {
       );*/
     });
 
-    
     test("should return 403 if user is not verified", async () => {
       await User.updateOne(
         { email: "john@example.com" },
@@ -419,7 +441,8 @@ describe("User Controller Integration Tests", () => {
 
       expect(response.body).toEqual({
         success: false,
-        message: "Account not verified. Please try add pin and confirm pin to get verified.",
+        message:
+          "Account not verified. Please try add pin and confirm pin to get verified.",
       });
     });
 
