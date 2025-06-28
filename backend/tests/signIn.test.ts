@@ -78,16 +78,7 @@ describe("SignUp Validation", () => {
   // Store these for duplicate tests
   const duplicateAccountUser = createUserData();
   const duplicateEmailUser = createUserData();
-
-  {
-    /*beforeAll(() => {
-    // Force console output
-    console.log("Created User is", JSON.stringify(createUserData(), null, 2));
-    console.log("duplicateAccountUser is", JSON.stringify(duplicateAccountUser, null, 2));
-    console.log("duplicateEmailUser is", JSON.stringify(duplicateEmailUser, null, 2));
-  });*/
-  }
-
+  
   describe("Required fields validation", () => {
     const validUser = createUserData();
     const fields: (keyof SignUpBody)[] = [
@@ -118,7 +109,8 @@ describe("SignUp Validation", () => {
     );
   });
 
-  test.each([
+  describe("Business Logic", ()=>{
+    test.each([
     [
       "Passwords do not match",
       createUserData({ confirmPassword: "Different123!" }),
@@ -132,14 +124,14 @@ describe("SignUp Validation", () => {
       "Account number already exists",
       createUserData({
         account: duplicateAccountUser.account,
-        //email: duplicateEmailUser.email
+      
       }),
     ],
     [
       "Email already exists",
       createUserData({
         email: duplicateEmailUser.email,
-        //account: duplicateAccountUser.account
+       
       }),
     ],
   ])(
@@ -167,4 +159,7 @@ describe("SignUp Validation", () => {
       });
     }
   );
+  })
+
+  
 });
