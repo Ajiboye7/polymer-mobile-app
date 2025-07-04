@@ -1,45 +1,3 @@
-/*import mongoose from "mongoose";
-import User from "../src/models/UserModels";
-jest.setTimeout(60000);
-
-
-
-describe("User.signIn()", () => {
-  test("should successfully sign in with correct credentials", async () => {
-    const user = await User.signIn("john@example.com", "Password123!");
-    expect(user).toHaveProperty("_id", user._id);
-    expect(user).toBeDefined();
-    expect(user.email).toBe("john@example.com");
-  });
-
-  test("should throw error for incorrect password", async () => {
-    await expect(
-      User.signIn("john@example.com", "WrongPassword123!")
-    ).rejects.toThrow("Incorrect Credentials");
-  });
-
-  test("should throw error for non-existent email", async () => {
-    await expect(
-      User.signIn("nonexistent@example.com", "Password123!")
-    ).rejects.toThrow("Incorrect Credentials");
-  });
-
-  test("should throw error for missing email or password", async () => {
-    await expect(User.signIn("", "Password123!")).rejects.toThrow(
-      "email and password require"
-    );
-
-    await expect(User.signIn("john@example.com", "")).rejects.toThrow(
-      "email and password require"
-    );
-  });
-
-  test("should normalize email during sign in", async () => {
-    const user = await User.signIn("John@Example.com", "Password123!");
-    expect(user.email).toBe("john@example.com");
-  });
-});*/
-
 jest.mock("jsonwebtoken");
 jest.mock("../src/config/env", () => ({
   JWT_SECRET: "test-secret",
@@ -51,10 +9,11 @@ jest.mock("../src/utils/send-otp", () => ({
 }));
 
 import request from "supertest";
-import app from "../src/app"; // Adjust path to your Express app
+import app from "../src/app";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { sendOtpEmail } from "../src/utils/send-otp";
+import { generateOTP } from "../src/utils/send-otp";
 import User from "../src/models/UserModels";
 
 interface SignUpBody {
@@ -79,21 +38,10 @@ const createUserData = (overrides?: Partial<SignUpBody>) => ({
   ...overrides,
 });
 
-/*const signInUserData = (overrides?: Partial<SignInBody>) => ({
-  email: createUserData().email,
-  password: createUserData().password,
-  ...overrides,
-});*/
-
-{/*const signInUserData : SignInBody={
-   email: createUserData().email,
-  password: createUserData().password,
-}*/}
-
 const duplicateAccountUser = createUserData();
 const duplicateEmailUser = createUserData();
 
-describe("SignUp Validation", () => {
+describe("SignUp test", () => {
   // Store these for duplicate tests
 
   describe("Required fields validation", () => {
@@ -179,119 +127,235 @@ describe("SignUp Validation", () => {
       }
     );
   });
-});
 
-describe("User creation", () => {
-  test("should a create user, send OTP and return token", async () => {
-    (sendOtpEmail as jest.Mock).mockResolvedValue(true);
-    (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
+  describe("Sign up user", () => {
+    test("should a create user, send OTP and return token", async () => {
+      (sendOtpEmail as jest.Mock).mockResolvedValue(true);
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
 
-    const response = await request(app)
-      .post("/api/auth/sign-up")
-      .send(createUserData())
-      .expect(201);
+      const response = await request(app)
+        .post("/api/auth/sign-up")
+        .send(createUserData())
+        .expect(201);
 
-    expect(response.body).toEqual({
-      success: true,
-      message: "User created successfully. OTP sent to email.",
-      data: {
-        user: {
-          _id: expect.any(String),
-          name: "John Doe",
-          account: expect.any(String),
-          email: expect.any(String),
-          token: "mocked-token-123",
+      expect(response.body).toEqual({
+        success: true,
+        message: "User created successfully. OTP sent to email.",
+        data: {
+          user: {
+            _id: expect.any(String),
+            name: "John Doe",
+            account: expect.any(String),
+            email: expect.any(String),
+            token: "mocked-token-123",
+          },
         },
-      },
+      });
+    });
+  });
+  describe("Error Handling", () => {
+    beforeEach(() => {
+      jest.requireMock("../src/config/env").JWT_SECRET = undefined;
+    });
+
+    afterEach(() => {
+      jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
+    });
+    test("should handle missing JWT SECRET", async () => {
+      const response = await request(app)
+        .post("/api/auth/sign-up")
+        .send(createUserData())
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: "An unexpected error occurred during registration",
+      });
+    });
+
+    test("should handle OTP email failure", async () => {
+      (sendOtpEmail as jest.Mock).mockRejectedValue(
+        "Failed to send OTP email. Please try again"
+      );
+
+      const response = await request(app)
+        .post("/api/auth/sign-up")
+        .send(createUserData())
+        .expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: "Failed to send OTP email. Please try again.",
+      });
+    });
+
+    test("should handle database error", async () => {
+      await mongoose.connection.close();
+
+      const response = await request(app)
+        .post("/api/auth/sign-up")
+        .send(createUserData())
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: "An unexpected error occurred during registration",
+      });
     });
   });
 });
 
-describe("Error Handling", () => {
-  beforeEach(() => {
-    jest.requireMock("../src/config/env").JWT_SECRET = undefined;
-  });
-
-  /*afterEach(()=>{
-     jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
-    })*/
-  test("should handle missing JWT SECRET", async () => {
-    const response = await request(app)
-      .post("/api/auth/sign-up")
-      .send(createUserData())
-      .expect(500);
-
-    expect(response.body).toEqual({
-      success: false,
-      message: "An unexpected error occurred during registration",
-    });
-  });
-
-  test("should handle OTP email failure", async () => {
-    (sendOtpEmail as jest.Mock).mockRejectedValue(
-      "Failed to send OTP email. Please try again"
-    );
-
-    const response = await request(app)
-      .post("/api/auth/sign-up")
-      .send(createUserData())
-      .expect(400);
-
-    expect(response.body).toEqual({
-      success: false,
-      message: "Failed to send OTP email. Please try again.",
-    });
-  });
-
-  test("should handle database error", async () => {
-    await mongoose.connection.close();
-
-    const response = await request(app)
-      .post("/api/auth/sign-up")
-      .send(createUserData())
-      .expect(500);
-
-    expect(response.body).toEqual({
-      success: false,
-      message: "An unexpected error occurred during registration",
-    });
-  });
-});
-
-describe("sign in test", () => {
+describe("SignIn test", () => {
+  let userData: SignUpBody;
   beforeEach(async () => {
-    await request(app).post("/api/auth/sign-up").send(createUserData());
+    userData = createUserData();
+    (sendOtpEmail as jest.Mock).mockResolvedValue(true);
 
-    await User.updateOne(
-      { email: createUserData().email },
-      { isVerified: true }
+    await request(app).post("/api/auth/sign-up").send(userData);
+
+    await User.updateOne({ email: userData.email }, { isVerified: true });
+  });
+
+  describe("Validation test", () => {
+    const fields: (keyof SignInBody)[] = ["email", "password"];
+
+    const invalidValues: any[] = ["", "   ", null, undefined];
+
+    test.each(fields)(
+      "should return 400 when %s is missing or empty",
+      async (field) => {
+        const validUser = {
+          email: userData.email,
+          password: userData.password,
+        };
+        for (const invalidValue of invalidValues) {
+          const invalidUser = { ...validUser, [field]: invalidValue };
+
+          const response = await request(app)
+            .post("/api/auth/sign-in")
+            .send(invalidUser)
+            .expect(400);
+
+          expect(response.body).toEqual({
+            success: false,
+            message: "email and password required",
+          });
+        }
+      }
     );
   });
 
-  test("should sign in user", async () => {
-    (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
+  describe("SignIn user", () => {
+    test("should successfully sign in user", async () => {
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
 
-    const response = await request(app).post("/api/auth/sign-in").send({
-      email: createUserData().email,
-      password: createUserData().password,
-    });
+      const response = await request(app).post("/api/auth/sign-in").send({
+        email: userData.email,
+        password: userData.password,
+      });
 
-    expect(response.body).toEqual({
-      success: true,
-      message: "Login successful",
-      data: {
-        user: {
-          _id: expect.any(String),
-          name: "John Doe",
-          account: expect.any(String),
-          email: expect.any(String),
-          token: "mocked-token-123",
-          pinSet: expect.any(Boolean),
-          isVerified: true,
-          //identityNumber: user.identityNumber,
-          //identityType: user.identityType,
+      expect(response.body).toEqual({
+        success: true,
+        message: "Login successful",
+        data: {
+          user: {
+            _id: expect.any(String),
+            name: "John Doe",
+            account: expect.any(String),
+            email: expect.any(String),
+            token: "mocked-token-123",
+            pinSet: expect.any(Boolean),
+            isVerified: true,
+          },
         },
-      },
-    })
+      });
+    });
+  });
+
+  type TestCase = {
+    errorMessage: string;
+    buildBody: () => SignInBody;
+  };
+
+  const testCases: TestCase[] = [
+    {
+      errorMessage: "Please enter a valid email",
+      buildBody: () => ({
+        email: "invalid-email",
+        password: userData.password,
+      }),
+    },
+    {
+      errorMessage: "Incorrect Credentials",
+      buildBody: () => ({
+        email: "nonexisting@gmail.com",
+        password: userData.password,
+      }),
+    },
+    {
+      errorMessage: "Incorrect Credentials",
+      buildBody: () => ({ email: userData.email, password: "wrong-password" }),
+    },
+  ];
+  describe("Business logic", () => {
+    test.each(testCases)(
+      "should return 400 for $errorMessage",
+      async ({ errorMessage, buildBody }) => {
+        const response = await request(app)
+          .post("/api/auth/sign-in")
+          .send(buildBody())
+          .expect(400);
+
+        expect(response.body).toEqual({
+          success: false,
+          message: errorMessage,
+        });
+      }
+    );
+    test("should test for unverified user", async () => {
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
+
+      await User.updateOne({ email: userData.email }, { isVerified: false });
+
+      const response = await request(app)
+        .post("/api/auth/sign-in")
+        .send({
+          email: userData.email,
+          password: userData.password,
+        })
+        .expect(403);
+
+      expect(response.body).toEqual({
+        success: false,
+        message:
+          "Account not verified. Please try add pin and confirm pin to get verified.",
+      });
+    });
+  });
+
+  describe("Error handling", () => {
+    describe("JWT SECRET error", () => {
+      beforeEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = undefined;
+      });
+
+      afterEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
+      });
+      test("should return 500 if JWT_SECRET is not defined", async () => {
+        const response = await request(app)
+          .post("/api/auth/sign-in")
+          .send({
+            email: userData.email,
+            password: userData.password,
+          })
+          .expect(500);
+
+        expect(response.body).toEqual({
+          success: false,
+          message: "An unexpected error occurred during login",
+        });
+      });
+    });
   });
 });

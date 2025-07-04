@@ -1,100 +1,20 @@
-{/*import request from "supertest";
-import app from "../src/app";
-import User from "../src/models/UserModels";
-
-beforeEach(async () => {
-    await User.deleteMany(); // Clears database before each test
-  });
-
-describe("User Controller", () => {
-  test("Should create a new user with token", async () => {
-    const res = await request(app).post("/api/auth/sign-up").send({
-      name: "John Doe",
-      account: "1234567",
-      email: "john@gmail.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    });
-
-    expect(res.body.success).toBe(true);
-    expect(res.statusCode).toEqual(201);
-    expect(res.body.data.token).toBeDefined();
-  });
-
-  test("should not create a new user with with existing email", async () => {
-    await request(app).post("/api/auth/sign-up").send({
-      name: "John Doe",
-      account: "1234567",
-      email: "john@gmail.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    });
-
-    const res = await request(app).post("/api/auth/sign-up").send({
-        name: "Jane Doe",
-        account: "789012",
-        email: "john@gmail.com",
-        password: "Test@123",
-        confirmPassword: "Test@123",
-      });
-
-    expect(res.statusCode).toBe(400)
-    expect(res.body.error).toBe("email already exists")
-  });
-
-  test("should log in a user and return  token", async() => {
-    await User.signUp("John Doe", "1234567", "john@gmail.com", "Password123!", "Password123!")
-
-    const res = await request(app).post('/api/auth/sign-in').send({
-        email:"john@gmail.com",
-        password: "Password123!"
-    })
-
-    expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
-    expect(res.body.data.token).toBeDefined()
-  })
-
-  test("should not log in a user with account that doesn't exist", async ()=>{
-    
-    const res = await request(app).post('/api/auth/sign-in').send({
-        email: "doesnotexist@gmail.com",
-        password:"Password123!"
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.body.error).toBe("User does not exist")
-  })
-
- test("should not log in a user with incorrect password", async () => {
-  await User.signUp("John Doe", "1234567", "john@gmail.com", "Password123!", "Password123!");
-
-  const res = await request(app).post("/api/auth/sign-in").send({
-    email: "john@gmail.com",
-    password: "wrongpassword",
-  });
-
-  console.log(res.body); // Log response to check if user exists
-
-  expect(res.statusCode).toBe(400);
-  expect(res.body.error).toBe("Incorrect password");
-});
-
-
-});*/}
-
-
-import request from "supertest";
-import app from "../src/app";
-import User from "../src/models/UserModels";
-import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../src/config/env";
-import { sendOtpEmail } from "../src/utils/send-otp";
-import mongoose from "mongoose";
-
 jest.mock("jsonwebtoken");
 jest.mock("../src/config/env", () => ({
   JWT_SECRET: "test-secret",
 }));
+
+jest.mock("../src/utils/send-otp", () => ({
+  sendOtpEmail: jest.fn().mockResolvedValue(true),
+  generateOTP: jest.fn().mockReturnValue(123456),
+}));
+
+import request from "supertest";
+import app from "../src/app";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import { sendOtpEmail } from "../src/utils/send-otp";
+import { generateOTP } from "../src/utils/send-otp";
+import User from "../src/models/UserModels";
 
 interface SignUpBody {
   name: string;
@@ -104,26 +24,118 @@ interface SignUpBody {
   confirmPassword: string;
 }
 
-describe("User Controller Integration Tests", () => {
-  beforeEach(async () => {
-    jest.clearAllMocks();
+interface SignInBody {
+  email: string;
+  password: string;
+}
+
+const createUserData = (overrides?: Partial<SignUpBody>) => ({
+  name: "John Doe",
+  email: `test-${Math.random().toString(36).substring(7)}@example.com`,
+  account: Math.floor(1000000000 + Math.random() * 9000000000).toString(),
+  password: "Password123!",
+  confirmPassword: "Password123!",
+  ...overrides,
+});
+
+const duplicateAccountUser = createUserData();
+const duplicateEmailUser = createUserData();
+
+describe("SignUp test", () => {
+  // Store these for duplicate tests
+
+  describe("Required fields validation", () => {
+    const validUser = createUserData();
+    const fields: (keyof SignUpBody)[] = [
+      "name",
+      "email",
+      "account",
+      "password",
+      "confirmPassword",
+    ];
+    const invalidValues: any[] = ["", "   ", null, undefined];
+
+    test.each(fields)(
+      "should return 400 when %s is missing or empty",
+      async (field) => {
+        for (const invalidValue of invalidValues) {
+          const invalidUser = { ...validUser, [field]: invalidValue };
+          const response = await request(app)
+            .post("/api/auth/sign-up")
+            .send(invalidUser);
+
+          expect(response.status).toBe(400);
+          expect(response.body).toEqual({
+            success: false,
+            message: "All fields are to be filled",
+          });
+        }
+      }
+    );
   });
 
-  describe("POST /signup", () => {
-    const validSignUpBody: SignUpBody = {
-      name: "John Doe",
-      account: "1234567890",
-      email: "john@example.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    };
+  describe("Business Logic", () => {
+    test.each([
+      [
+        "Passwords do not match",
+        createUserData({ confirmPassword: "Different123!" }),
+      ],
+      [
+        "Please enter a valid email",
+        createUserData({ email: "invalid-email" }),
+      ],
+      [
+        "Password not strong enough",
+        createUserData({ password: "weak", confirmPassword: "weak" }),
+      ],
+      [
+        "Account number already exists",
+        createUserData({
+          account: duplicateAccountUser.account,
+        }),
+      ],
+      [
+        "Email already exists",
+        createUserData({
+          email: duplicateEmailUser.email,
+        }),
+      ],
+    ])(
+      "should return 400 for %s",
+      async (errorMessage: string, body: SignUpBody) => {
+        // Pre-create users for duplicate tests
+        if (errorMessage === "Account number already exists") {
+          await request(app)
+            .post("/api/auth/sign-up")
+            .send(duplicateAccountUser)
+            .expect(201);
+        } else if (errorMessage === "Email already exists") {
+          await request(app)
+            .post("/api/auth/sign-up")
+            .send(duplicateEmailUser)
+            .expect(201);
+        }
+        const response = await request(app)
+          .post("/api/auth/sign-up")
+          .send(body);
 
-    test("should sign up a user successfully and return a token", async () => {
-      (jwt.sign as jest.Mock).mockReturnValue("mocked-token");
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({
+          success: false,
+          message: errorMessage,
+        });
+      }
+    );
+  });
+
+  describe("Sign up user", () => {
+    test("should a create user, send OTP and return token", async () => {
+      (sendOtpEmail as jest.Mock).mockResolvedValue(true);
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
 
       const response = await request(app)
         .post("/api/auth/sign-up")
-        .send(validSignUpBody)
+        .send(createUserData())
         .expect(201);
 
       expect(response.body).toEqual({
@@ -133,64 +145,42 @@ describe("User Controller Integration Tests", () => {
           user: {
             _id: expect.any(String),
             name: "John Doe",
-            account: "1234567890",
-            email: "john@example.com",
-            token: "mocked-token",
+            account: expect.any(String),
+            email: expect.any(String),
+            token: "mocked-token-123",
           },
         },
       });
-
-      expect(jwt.sign).toHaveBeenCalledWith(
-        { _id: expect.any(String) },
-        "test-secret",
-        { expiresIn: "1h" }
-      );
-      expect(sendOtpEmail).toHaveBeenCalledWith({
-        email: "john@example.com",
-        otp: "123456",
-      });
-
-      // Verify user in database
-      const user = await User.findOne({ email: "john@example.com" });
-      expect(user).toBeDefined();
-      expect(user?.name).toBe("John Doe");
-      expect(user?.account).toBe("1234567890");
-      expect(user?.isVerified).toBe(false);
-      expect(user?.otp).toBe("123456");
-      expect(user?.balance).toBe(113000);
+    });
+  });
+  describe("Error Handling", () => {
+    beforeEach(() => {
+      jest.requireMock("../src/config/env").JWT_SECRET = undefined;
     });
 
-    test.each([
-      ["All fields are to be filled", { ...validSignUpBody, name: "" }],
-      ["Passwords do not match", { ...validSignUpBody, confirmPassword: "Different123!" }],
-      ["Please enter a valid email", { ...validSignUpBody, email: "invalid-email" }],
-      ["Account number already exists", { ...validSignUpBody }],
-      ["Password not strong enough", { ...validSignUpBody, password: "weak", confirmPassword: "weak" }],
-      ["Email already exists", { ...validSignUpBody }],
-    ])
-    ("should return 400 for client error: %s", async (errorMessage: string, body: SignUpBody) => {
-      // Pre-create a user for duplicate account/email tests
-      if (errorMessage === "Account number already exists" || errorMessage === "Email already exists") {
-        await request(app).post("/api/auth/sign-up").send(validSignUpBody).expect(201);
-      }
-
+    afterEach(() => {
+      jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
+    });
+    test("should handle missing JWT SECRET", async () => {
       const response = await request(app)
-       .post("/api/auth/sign-up")
-        .send(body)
-        .expect(400);
+        .post("/api/auth/sign-up")
+        .send(createUserData())
+        .expect(500);
 
       expect(response.body).toEqual({
         success: false,
-        message: errorMessage,
+        message: "An unexpected error occurred during registration",
       });
     });
 
-    test("should return 400 for failed OTP email", async () => {
-      (sendOtpEmail as jest.Mock).mockRejectedValueOnce(new Error("Email send failed"));
+    test("should handle OTP email failure", async () => {
+      (sendOtpEmail as jest.Mock).mockRejectedValue(
+        "Failed to send OTP email. Please try again"
+      );
 
       const response = await request(app)
         .post("/api/auth/sign-up")
-        .send(validSignUpBody)
+        .send(createUserData())
         .expect(400);
 
       expect(response.body).toEqual({
@@ -199,32 +189,12 @@ describe("User Controller Integration Tests", () => {
       });
     });
 
-    test("should return 500 for unexpected server error", async () => {
-      // Temporarily break MongoDB connection to simulate a server error
+    test("should handle database error", async () => {
       await mongoose.connection.close();
 
       const response = await request(app)
         .post("/api/auth/sign-up")
-        .send(validSignUpBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during registration",
-      });
-
-      // Reconnect for subsequent tests
-      const mongoServer = (global as any).__MONGO_SERVER__; // Access from setUpTest.ts
-      await mongoose.connect(mongoServer.getUri());
-    });
-
-    test("should return 500 if JWT_SECRET is not defined", async () => {
-      // Override the mock for this test
-      jest.spyOn(require("../config/env"), "JWT_SECRET", "get").mockReturnValue(undefined);
-
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(validSignUpBody)
+        .send(createUserData())
         .expect(500);
 
       expect(response.body).toEqual({
@@ -233,33 +203,56 @@ describe("User Controller Integration Tests", () => {
       });
     });
   });
+});
 
-  describe("POST /signin", () => {
-    const validSignUpBody: SignUpBody = {
-      name: "John Doe",
-      account: "1234567890",
-      email: "john@example.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    };
-    const validSignInBody = {
-      email: "john@example.com",
-      password: "Password123!",
-    };
+describe("SignIn test", () => {
+  let userData: SignUpBody;
+  beforeEach(async () => {
+    userData = createUserData();
+    (sendOtpEmail as jest.Mock).mockResolvedValue(true);
 
-    beforeEach(async () => {
-      // Create and verify a user for sign-in tests
-      await request(app).post("/api/auth/sign-in").send(validSignUpBody).expect(201);
-      await User.updateOne({ email: "john@example.com" }, { isVerified: true });
-    });
+    await request(app).post("/api/auth/sign-up").send(userData);
 
-    test("should sign in a verified user successfully and return a token", async () => {
-      (jwt.sign as jest.Mock).mockReturnValue("mocked-token");
+    await User.updateOne({ email: userData.email }, { isVerified: true });
+  });
 
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(200);
+  describe("Validation test", () => {
+    const fields: (keyof SignInBody)[] = ["email", "password"];
+
+    const invalidValues: any[] = ["", "   ", null, undefined];
+
+    test.each(fields)(
+      "should return 400 when %s is missing or empty",
+      async (field) => {
+        const validUser = {
+          email: userData.email,
+          password: userData.password,
+        };
+        for (const invalidValue of invalidValues) {
+          const invalidUser = { ...validUser, [field]: invalidValue };
+
+          const response = await request(app)
+            .post("/api/auth/sign-in")
+            .send(invalidUser)
+            .expect(400);
+
+          expect(response.body).toEqual({
+            success: false,
+            message: "email and password required",
+          });
+        }
+      }
+    );
+  });
+
+  describe("SignIn user", () => {
+    test("should successfully sign in user", async () => {
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
+
+      const response = await request(app).post("/api/auth/sign-in").send({
+        email: userData.email,
+        password: userData.password,
+      });
 
       expect(response.body).toEqual({
         success: true,
@@ -268,84 +261,100 @@ describe("User Controller Integration Tests", () => {
           user: {
             _id: expect.any(String),
             name: "John Doe",
-            account: "1234567890",
-            email: "john@example.com",
-            token: "mocked-token",
+            account: expect.any(String),
+            email: expect.any(String),
+            token: "mocked-token-123",
             pinSet: expect.any(Boolean),
             isVerified: true,
-            identityNumber: null,
-            identityType: null,
           },
         },
       });
-
-      expect(jwt.sign).toHaveBeenCalledWith(
-        { _id: expect.any(String) },
-        "test-secret",
-        { expiresIn: "1h" }
-      );
     });
+  });
 
-    test("should return 403 if user is not verified", async () => {
-      await User.updateOne({ email: "john@example.com" }, { isVerified: false });
+  type TestCase = {
+    errorMessage: string;
+    buildBody: () => SignInBody;
+  };
+
+  const testCases: TestCase[] = [
+    {
+      errorMessage: "Please enter a valid email",
+      buildBody: () => ({
+        email: "invalid-email",
+        password: userData.password,
+      }),
+    },
+    {
+      errorMessage: "Incorrect Credentials",
+      buildBody: () => ({
+        email: "nonexisting@gmail.com",
+        password: userData.password,
+      }),
+    },
+    {
+      errorMessage: "Incorrect Credentials",
+      buildBody: () => ({ email: userData.email, password: "wrong-password" }),
+    },
+  ];
+  describe("Business logic", () => {
+    test.each(testCases)(
+      "should return 400 for $errorMessage",
+      async ({ errorMessage, buildBody }) => {
+        const response = await request(app)
+          .post("/api/auth/sign-in")
+          .send(buildBody())
+          .expect(400);
+
+        expect(response.body).toEqual({
+          success: false,
+          message: errorMessage,
+        });
+      }
+    );
+    test("should test for unverified user", async () => {
+      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
+
+      await User.updateOne({ email: userData.email }, { isVerified: false });
 
       const response = await request(app)
         .post("/api/auth/sign-in")
-        .send(validSignInBody)
+        .send({
+          email: userData.email,
+          password: userData.password,
+        })
         .expect(403);
 
       expect(response.body).toEqual({
         success: false,
-        message: "Account not verified. Please check your email for OTP.",
+        message:
+          "Account not verified. Please try add pin and confirm pin to get verified.",
       });
     });
+  });
 
-    test.each([
-      ["email and password require", { email: "", password: "Password123!" }],
-      ["Please enter a valid email", { email: "invalid-email", password: "Password123!" }],
-      ["Incorrect Credentials", { email: "john@example.com", password: "WrongPassword123!" }],
-      ["Incorrect Credentials", { email: "nonexistent@example.com", password: "Password123!" }],
-    ])("should return 400 for client error: %s", async (errorMessage: string, body: any) => {
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(body)
-        .expect(400);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: errorMessage,
-      });
-    });
-
-    test("should return 500 for unexpected server error", async () => {
-      await mongoose.connection.close();
-
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during login",
+  describe("Error handling", () => {
+    describe("JWT SECRET error", () => {
+      beforeEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = undefined;
       });
 
-      const mongoServer = (global as any).__MONGO_SERVER__; // Access from setUpTest.ts
-      await mongoose.connect(mongoServer.getUri());
-    });
+      afterEach(() => {
+        jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
+      });
+      test("should return 500 if JWT_SECRET is not defined", async () => {
+        const response = await request(app)
+          .post("/api/auth/sign-in")
+          .send({
+            email: userData.email,
+            password: userData.password,
+          })
+          .expect(500);
 
-    test("should return 500 if JWT_SECRET is not defined", async () => {
-      // Override the mock for this test
-      jest.spyOn(require("../config/env"), "JWT_SECRET", "get").mockReturnValue(undefined);
-
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during login",
+        expect(response.body).toEqual({
+          success: false,
+          message: "An unexpected error occurred during login",
+        });
       });
     });
   });

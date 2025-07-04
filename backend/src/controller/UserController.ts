@@ -23,9 +23,7 @@ export const signUpUser = async (req: Request, res: Response): Promise<any> => {
       confirmPassword
     );
     const token = createToken(user._id);
-    // console.log("User created:", user);
-    // console.log("Token created:", token);
-    //console.log("JWT_SECRET in signUpUser:", JWT_SECRET);
+
 
     return res.status(201).json({
       success: true,
