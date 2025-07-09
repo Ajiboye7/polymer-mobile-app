@@ -34,6 +34,17 @@ app.use("/api/auth", RefreshTokenRoute)
 app.use("/user/profile", ProfileRoutes);
 app.use("/user/balance", BalanceRoute)
 
+/* 
+app.use('/api/auth', UserRoute); // Sign-up, sign-in
+app.use('/api/otp', OtpRoute);
+app.use('/api/identity', IdentityRoute); // Update identity routes
+app.use('/api/pin', PinRoutes);
+app.use('/api/account-type', AccountTypeRoute);
+app.use('/api/refresh-token', RefreshTokenRoute);
+app.use('/user/profile', ProfileRoutes);
+app.use('/user/balance', BalanceRoute);
+*/
+
 
 const uploadsDir = path.join(__dirname, "../../backend/uploads");
 

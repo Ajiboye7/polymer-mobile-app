@@ -9,15 +9,20 @@ export const updateIdentity = async (
   const userId = req.user._id;
 
   try {
-   
-    if (!userId || !identityType) {
+    if (!identityType) {
       return res.status(400).json({
         success: false,
-        message: "User ID and identity type are required",
+        message: "Identity type are required",
       });
     }
 
-   
+    if(!userId){
+      return res.status(401).json({
+        success: false,
+        message: "Request is not authorized",
+      });
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { identityType },
@@ -30,12 +35,12 @@ export const updateIdentity = async (
         message: "User not found",
       });
     }
+    
 
-     return res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Identity type updated successfully",
       data: {
-       
         identityType: updatedUser.identityType,
       },
     });
@@ -52,7 +57,7 @@ export const identityNumber = async (
   req: Request,
   res: Response
 ): Promise<any> => {
-  const {  identityNumber } = req.body;
+  const { identityNumber } = req.body;
   const userId = req.user._id;
 
   try {

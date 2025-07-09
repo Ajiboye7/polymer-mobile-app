@@ -1,402 +1,149 @@
-jest.mock("jsonwebtoken");
+import request from "supertest";
+import app from "../src/app";
+import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import express, { Request, Response, NextFunction } from "express";
+import { updateIdentity } from "../src/controller/IdentityController";
+import User from "../src/models/UserModels";
+import * as requiredAuthModule from "../src/middleware/requiredAuth";
+
 jest.mock("../src/config/env", () => ({
   JWT_SECRET: "test-secret",
 }));
 
-jest.mock("../src/utils/send-otp", () => ({
-  sendOtpEmail: jest.fn().mockResolvedValue(true),
-  generateOTP: jest.fn().mockReturnValue(123456),
-}));
+jest.mock("../src/middleware/requiredAuth");
 
-import request from "supertest";
-import app from "../src/app";
-import mongoose from "mongoose";
-import jwt from "jsonwebtoken";
-import { sendOtpEmail } from "../src/utils/send-otp";
-import User from "../src/models/UserModels";
+describe("update user identity test", () => {
+  let userId: string;
 
-
-interface SignUpBody {
-  name: string;
-  account: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
-
-interface SignInBody {
-  email: string;
-  password: string;
-}
-
-describe("User Controller Integration Tests", () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
-  });
-
-  describe("POST /api/auth/sign-up", () => {
-    const validSignUpBody: SignUpBody = {
-      name: "John Doe",
+    userId = new mongoose.Types.ObjectId().toString();
+    await User.create({
+      _id: userId,
+      name: "Jane Doe",
       account: "1234567890",
-      email: "john@example.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    };
-
-    const invalidFieldTests: [keyof SignUpBody, string | null | undefined][] = [
-      ["name", ""],
-      ["name", "   "],
-      ["name", null],
-      ["name", undefined],
-      ["account", ""],
-      ["account", "   "],
-      ["account", null],
-      ["account", undefined],
-      ["email", ""],
-      ["email", "   "],
-      ["email", null],
-      ["email", undefined],
-      ["password", ""],
-      ["password", "   "],
-      ["password", null],
-      ["password", undefined],
-      ["confirmPassword", ""],
-      ["confirmPassword", "   "],
-      ["confirmPassword", null],
-      ["confirmPassword", undefined],
-    ];
-
-    test("should sign up a user successfully and return a token", async () => {
-      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
-
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(validSignUpBody)
-        .expect(201);
-      console.log("sign up response", response);
-      expect(response.body.data.user.token).toBe("mocked-token-123");
-
-      expect(response.body).toEqual({
-        success: true,
-        message: "User created successfully. OTP sent to email.",
-        data: {
-          user: {
-            _id: expect.any(String),
-            name: "John Doe",
-            account: "1234567890",
-            email: "john@example.com",
-            token: "mocked-token-123",
-          },
-        },
-      });
-
-      /*expect(sendOtpEmail).toHaveBeenCalledWith({
-        email: "john@example.com",
-        otp: "123456",
-      });*/
-
-      // Verify user in database
-      /*const user = await User.findOne({ email: "john@example.com" });
-      expect(user).toBeDefined();
-      expect(user?.name).toBe("John Doe");
-      expect(user?.account).toBe("1234567890");
-      expect(user?.email).toBe("john@example.com")
-      expect(user?.isVerified).toBe(false);
-      expect(user?.otp).toBe("123456");
-      expect(user?.balance).toBe(113000);*/
+      email: "jane@example.com",
+      password: "password123!",
+      //identityType: "nin",
     });
 
-    test.each(invalidFieldTests)(
-      "should return 400 for invalid %s",
-      async (
-        field: keyof SignUpBody,
-        invalidValue: string | null | undefined
-      ) => {
-        const body: SignUpBody = { ...validSignUpBody, [field]: invalidValue };
-        const response = await request(app)
-          .post("/api/auth/sign-up")
-          .send(body);
-        //console.log(`Sign-up error response for ${field}=${JSON.stringify(invalidValue)}:`, JSON.stringify(response.body, null, 2));
-        expect(response.status).toBe(400);
-        expect(response.body).toEqual({
-          success: false,
-          message: "All fields are to be filled",
-        });
-      }
-    );
-
-    test.each([
-      [
-        "Passwords do not match",
-        { ...validSignUpBody, confirmPassword: "Different123!" },
-      ],
-      [
-        "Please enter a valid email",
-        { ...validSignUpBody, email: "invalid-email" },
-      ],
-      [
-        "Password not strong enough",
-        { ...validSignUpBody, password: "weak", confirmPassword: "weak" },
-      ],
-      ["Account number already exists", { ...validSignUpBody }],
-      ["Email already exists", { ...validSignUpBody, account: "123476890" }],
-    ])(
-      "should return 400 for client error: %s",
-      async (errorMessage: string, body: SignUpBody) => {
-        // Pre-create a user for duplicate account/email tests
-        if (
-          errorMessage === "Account number already exists" ||
-          errorMessage === "Email already exists"
-        ) {
-          await request(app)
-            .post("/api/auth/sign-up")
-            .send(validSignUpBody)
-            .expect(201);
+    jest
+      .spyOn(requiredAuthModule, "default")
+      .mockImplementation(
+        async (
+          req: Request,
+          res: Response,
+          next: NextFunction
+        ): Promise<any> => {
+          if (req.headers.authorization === "Bearer mocked-token") {
+            req.user = { _id: userId.toString() };
+            return next();
+          } else {
+            return res.status(401).json({
+              success: false,
+              message: "Invalid or missing token",
+            });
+          }
         }
-
-        const response = await request(app)
-          .post("/api/auth/sign-up")
-          .send(body);
-        console.log(
-          "Sign-up error response:",
-          JSON.stringify(response.body, null, 2)
-        );
-        expect(response.status).toBe(400);
-        expect(response.body).toEqual({
-          success: false,
-          message: errorMessage,
-        });
-      }
-    );
-    test("should return 400 for failed OTP email", async () => {
-      (sendOtpEmail as jest.Mock).mockRejectedValueOnce(
-        new Error("Email send failed")
       );
-
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(validSignUpBody)
-        .expect(400);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "Failed to send OTP email. Please try again.",
-      });
-    });
-
-    test("should return 500 for unexpected server error", async () => {
-      // Temporarily break MongoDB connection to simulate a server error
-      await mongoose.connection.close();
-
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(validSignUpBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during registration",
-      });
-
-      // Reconnect for subsequent tests
-      const mongoServer = (global as any).__MONGO_SERVER__;
-      if (mongoServer) {
-        await mongoose.connect(mongoServer.getUri(), {
-          serverSelectionTimeoutMS: 30000,
-          socketTimeoutMS: 30000,
-          connectTimeoutMS: 30000,
-        });
-      } else {
-        throw new Error(
-          "MongoMemoryServer instance not available for reconnection."
-        );
-      }
-    });
-
-    {
-      /*test("should return 500 if JWT_SECRET is not defined", async () => {
-      jest.requireMock("../src/config/env").JWT_SECRET = undefined;
-
-      const response = await request(app)
-        .post("/api/auth/sign-up")
-        .send(validSignUpBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during registration",
-      });
-    });*/
-    }
-
-    describe("when JWT_SECRET is not defined", () => {
-      beforeEach(() => {
-        jest.requireMock("../src/config/env").JWT_SECRET = undefined;
-      });
-
-      afterEach(() => {
-        jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
-      });
-
-      test("should return 500 if JWT_SECRET is not defined", async () => {
-        const response = await request(app)
-          .post("/api/auth/sign-up")
-          .send(validSignUpBody)
-          .expect(500);
-
-        expect(response.body).toEqual({
-          success: false,
-          message: "An unexpected error occurred during registration",
-        });
-      });
-    });
   });
 
-  describe("POST /api/auth/sign-in", () => {
-    const validSignUpBody: SignUpBody = {
-      name: "John Doe",
-      account: "1234567890",
-      email: "john@example.com",
-      password: "Password123!",
-      confirmPassword: "Password123!",
-    };
-    const validSignInBody: SignInBody = {
-      email: "john@example.com",
-      password: "Password123!",
-    };
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    beforeEach(async () => {
-      jest.clearAllMocks();
-      //jest.requireMock("../src/config/env").JWT_SECRET = "test-secret";
-      await request(app).post("/api/auth/sign-up").send(validSignUpBody);
-
-      //.expect(201);
-      await User.updateOne({ email: "john@example.com" }, { isVerified: true });
-    });
-
-    test("should sign in a verified user successfully and return a token", async () => {
-      (jwt.sign as jest.Mock).mockReturnValue("mocked-token-123");
-
+  describe("successful update", () => {
+    test("should successfully update user identity", async () => {
       const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(200);
-      console.log("this is response", response.body);
+        .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({ identityType: "bvn" });
 
-      expect(response.body.data.user.token).toBe("mocked-token-123");
-
+      expect(response.status).toBe(200);
       expect(response.body).toEqual({
         success: true,
-        message: "Login successful",
+        message: "Identity type updated successfully",
         data: {
-          user: {
-            _id: expect.any(String),
-            name: "John Doe",
-            account: "1234567890",
-            email: "john@example.com",
-            token: "mocked-token-123",
-            pinSet: expect.any(Boolean),
-            isVerified: true,
-            //identityNumber: expect.any(String),
-            //identityType: expect.any(String),
-          },
+          identityType: "bvn",
         },
-      });
-
-      /*expect(jwt.sign).toHaveBeenCalledWith(
-        { _id: expect.any(String) },
-        "test-secret",
-        { expiresIn: "1h" }
-      );*/
-    });
-
-    test("should return 403 if user is not verified", async () => {
-      await User.updateOne(
-        { email: "john@example.com" },
-        { isVerified: false }
-      );
-
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(403);
-
-      expect(response.body).toEqual({
-        success: false,
-        message:
-          "Account not verified. Please try add pin and confirm pin to get verified.",
-      });
-    });
-
-    test.each([
-      ["email and password required", { email: "", password: "Password123!" }],
-      [
-        "Please enter a valid email",
-        { email: "invalid-email", password: "Password123!" },
-      ],
-      [
-        "Incorrect Credentials",
-        { email: "john@example.com", password: "WrongPassword123!" },
-      ],
-      [
-        "Incorrect Credentials",
-        { email: "nonexistent@example.com", password: "Password123!" },
-      ],
-    ])(
-      "should return 400 for client error: %s",
-      async (errorMessage: string, body: SignInBody) => {
-        const response = await request(app)
-          .post("/api/auth/sign-in")
-          .send(body)
-          .expect(400);
-
-        expect(response.body).toEqual({
-          success: false,
-          message: errorMessage,
-        });
-      }
-    );
-
-    test("should return 500 for unexpected server error", async () => {
-      await mongoose.connection.close();
-
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during login",
-      });
-
-      const mongoServer = (global as any).__MONGO_SERVER__;
-      if (mongoServer) {
-        await mongoose.connect(mongoServer.getUri(), {
-          serverSelectionTimeoutMS: 30000,
-          socketTimeoutMS: 30000,
-          connectTimeoutMS: 30000,
-        });
-      } else {
-        throw new Error(
-          "MongoMemoryServer instance not available for reconnection."
-        );
-      }
-    });
-
-    test("should return 500 if JWT_SECRET is not defined", async () => {
-      // Override the mock for this test
-      jest.requireMock("../src/config/env").JWT_SECRET = undefined;
-
-      const response = await request(app)
-        .post("/api/auth/sign-in")
-        .send(validSignInBody)
-        .expect(500);
-
-      expect(response.body).toEqual({
-        success: false,
-        message: "An unexpected error occurred during login",
       });
     });
   });
+
+  describe("Validation error", () => {
+    test("should return 400 for an empty identity type", async () => {
+      const response = await request(app)
+        .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({
+          /*identityType: "bvn" */
+        })
+        .expect(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: "Identity type are required",
+      });
+    });
+  });
+
+  describe("Unauthorized request", () => {
+    test("should return 401 for invalid or missing user id ", async () => {
+      jest
+        .spyOn(requiredAuthModule, "default")
+        .mockImplementation(
+          async (
+            req: Request,
+            res: Response,
+            next: NextFunction
+          ): Promise<any> => {
+            // Simulate a logged-in request where user ID is missing
+            req.user = { _id: "" }; // or omit setting it at all
+            return next();
+          }
+        );
+      const response = await request(app)
+        .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({ identityType: "bvn" })
+        .expect(401);
+
+      expect(response.body).toEqual({
+        success: false,
+        message: "Request is not authorized",
+      });
+    });
+  });
+
+  describe('Non existing user', ()=>{
+    test('should return 404 if user does not exist', async ()=>{
+      await User.deleteOne({_id:userId})
+      
+      const response = await request(app)
+       .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({ identityType: "bvn" }).expect(404)
+
+        expect(response.body).toEqual({
+          success: false,
+        message: "User not found",
+        })
+    })
+  })
+
+
+  describe('Internal server error', ()=>{
+    test('should return 500 for database error', async ()=>{
+      await mongoose.connection.close()
+
+      const response = await request(app)
+       .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({ identityType: "bvn" }).expect(500)
+
+        expect(response.body).toEqual({
+           success: false,
+        message: "Internal server error during identity update"
+        })
+    })
+  })
 });
