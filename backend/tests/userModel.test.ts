@@ -29,13 +29,6 @@ describe("User.signUp()", () => {
         )
       );
 
-    /*.mockImplementation((data: string | Buffer, encrypted: string) =>
-        Promise.resolve(
-          typeof data === "string" &&
-            data === "Password123!" &&
-            encrypted === "mocked_hashed_password"
-        )
-      );*/
     user = await User.signUp(
       "John Doe",
       "1234567890",
@@ -215,13 +208,6 @@ describe("User.signIn()", () => {
         )
       );
 
-    /*.mockImplementation((data: string | Buffer, encrypted: string) =>
-        Promise.resolve(
-          typeof data === "string" &&
-            data === "Password123!" &&
-            encrypted === "mocked_hashed_password"
-        )
-      );*/
 
     testUser = await User.signUp(
       "John Doe",

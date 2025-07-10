@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import User from "../models/UserModels";
 
 export const accountType = async(req: Request, res: Response): Promise<any> =>{
-    const {/*userId,*/ accountType} = req.body
+    const { accountType} = req.body
     const userId = req.user._id;
 
     try{

@@ -114,36 +114,37 @@ describe("update user identity test", () => {
     });
   });
 
-  describe('Non existing user', ()=>{
-    test('should return 404 if user does not exist', async ()=>{
-      await User.deleteOne({_id:userId})
-      
-      const response = await request(app)
-       .put("/api/auth/add-identity-type")
-        .set("Authorization", "Bearer mocked-token")
-        .send({ identityType: "bvn" }).expect(404)
+  describe("Non existing user", () => {
+    test("should return 404 if user does not exist", async () => {
+      await User.deleteOne({ _id: userId });
 
-        expect(response.body).toEqual({
-          success: false,
+      const response = await request(app)
+        .put("/api/auth/add-identity-type")
+        .set("Authorization", "Bearer mocked-token")
+        .send({ identityType: "bvn" })
+        .expect(404);
+
+      expect(response.body).toEqual({
+        success: false,
         message: "User not found",
-        })
-    })
-  })
+      });
+    });
+  });
 
-
-  describe('Internal server error', ()=>{
-    test('should return 500 for database error', async ()=>{
-      await mongoose.connection.close()
+  describe("Internal server error", () => {
+    test("should return 500 for database error", async () => {
+      await mongoose.connection.close();
 
       const response = await request(app)
-       .put("/api/auth/add-identity-type")
+        .put("/api/auth/add-identity-type")
         .set("Authorization", "Bearer mocked-token")
-        .send({ identityType: "bvn" }).expect(500)
+        .send({ identityType: "bvn" })
+        .expect(500);
 
-        expect(response.body).toEqual({
-           success: false,
-        message: "Internal server error during identity update"
-        })
-    })
-  })
+      expect(response.body).toEqual({
+        success: false,
+        message: "Internal server error during identity update",
+      });
+    });
+  });
 });
