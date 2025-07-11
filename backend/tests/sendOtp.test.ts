@@ -96,8 +96,8 @@ describe("update user identity test", () => {
             res: Response,
             next: NextFunction
           ): Promise<any> => {
-            // Simulate a logged-in request where user ID is missing
-            req.user = { _id: "" }; // or omit setting it at all
+            
+            req.user = { _id: "" }; 
             return next();
           }
         );

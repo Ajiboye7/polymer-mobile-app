@@ -1,10 +1,10 @@
-jest.mock("../src/utils/send-otp", () => ({
+jest.mock("../../src/utils/send-otp", () => ({
   sendOtpEmail: jest.fn().mockResolvedValue(true),
   generateOTP: jest.fn().mockReturnValue(123456),
 }));
 
-import User from "../src/models/UserModels";
-import { sendOtpEmail, generateOTP } from "../src/utils/send-otp";
+import User from "../../src/models/UserModels";
+import { sendOtpEmail, generateOTP } from "../../src/utils/send-otp";
 import bcrypt from "bcrypt";
 
 jest.setTimeout(60000);
