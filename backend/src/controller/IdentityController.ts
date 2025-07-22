@@ -61,10 +61,17 @@ export const identityNumber = async (
   const userId = req.user._id;
 
   try {
-    if (!userId || !identityNumber) {
+    if (!identityNumber) {
       return res.status(400).json({
         success: false,
-        message: "User ID and identity number are required",
+        message: "Identity number is required",
+      });
+    }
+
+    if(!userId){
+      return res.status(401).json({
+        success: false,
+        message: "Request is not authorized",
       });
     }
 
