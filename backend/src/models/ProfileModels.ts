@@ -28,7 +28,7 @@ const ProfileSchema = new Schema<IProfile, IProfileModel>(
     },
     nextOfKinRelationship: {
       type: String,
-      required: [true, "Next of kin relationship is required"],
+      required: [true, "Nex t of kin relationship is required"],
       trim: true,
     },
 

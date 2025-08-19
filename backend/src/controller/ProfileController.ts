@@ -10,8 +10,13 @@ export const createProfile = async (
   try {
     const { phoneNumber, address, nextOfKin, nextOfKinRelationship } = req.body;
     const userId = req.user._id;
-    //console.log("userId from request", userId);
-    //console.log("Received data:", req.body);
+
+    if(!userId){
+       return res.status(400).json({
+        success: false,
+        message: "This user does not exist",
+      });
+    }
     const existingProfile = await UserProfile.findOne({ userId });
     if (existingProfile) {
       return res.status(400).json({
