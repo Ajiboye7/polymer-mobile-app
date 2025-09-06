@@ -177,7 +177,7 @@ export const icons = {
   businessOwner,
   regularUser,
   rates,
-  send2,
+  send2,a
   dropDown,
   exchange,
   america,
