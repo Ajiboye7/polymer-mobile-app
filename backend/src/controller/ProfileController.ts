@@ -73,7 +73,7 @@ export const uploadProfilePicture = async (
   const imageUri = `/uploads/profile-pictures/${req.file?.filename}`;
 
   try {
-    
+    //console.log(req.file)
     if (!req.file) {
       return res.status(400).json({
         success: false,
