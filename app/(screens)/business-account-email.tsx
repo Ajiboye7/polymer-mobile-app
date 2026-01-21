@@ -17,7 +17,7 @@ const BusinessAccountEmail = () => {
       <EmailContent 
       headerText='Business account'
       message='Your business account ( name of business ) has been successfully created , you can now make local and international transfers with ease, check out the app for more business benefits.'
-      //showFooterText={true}
+
       />
 
       <EmailFooter/>
